@@ -33,30 +33,30 @@ class AllNotesFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         inflateToolbar()
-        notesAdapter = AllNotesAdapter(requireContext())
 
-        noteViewModel.getAllNotes.observe(viewLifecycleOwner) { listOfNotes ->
-            noteViewModel.isDbEmpty(listOfNotes)
-            notesAdapter?.setData(listOfNotes as ArrayList<Note>)
-        }
+        notesAdapter = AllNotesAdapter(requireContext())
         binding.listOfNotesRecyclerView.adapter = notesAdapter
 
-        val layoutManager = GridLayoutManager(requireContext(), 2)
-        layoutManager.orientation = GridLayoutManager.VERTICAL
-        layoutManager.reverseLayout = false
-
-        // ✅ Safe SpanSizeLookup fix (prevents crash)
-        layoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
-            override fun getSpanSize(position: Int): Int {
-                return 1 // each note occupies 1 column safely
+        val layoutManager = GridLayoutManager(requireContext(), 2).apply {
+            orientation = GridLayoutManager.VERTICAL
+            reverseLayout = false
+            // Safe default to avoid span lookup crashes
+            spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                override fun getSpanSize(position: Int): Int = 1
             }
         }
 
         binding.listOfNotesRecyclerView.layoutManager = layoutManager
         binding.listOfNotesRecyclerView.setHasFixedSize(true)
 
-        noteViewModel.emptyDb.observe(viewLifecycleOwner) {
-            displayNoData(it)
+        noteViewModel.getAllNotes.observe(viewLifecycleOwner) { listOfNotes ->
+            noteViewModel.isDbEmpty(listOfNotes)
+            // Avoid ClassCastException: copy to ArrayList
+            notesAdapter?.setData(ArrayList(listOfNotes))
+        }
+
+        noteViewModel.emptyDb.observe(viewLifecycleOwner) { isEmpty ->
+            displayNoData(isEmpty)
         }
 
         binding.addNewNote.setOnClickListener {
@@ -78,25 +78,18 @@ class AllNotesFragment : Fragment() {
 
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
                 return when (menuItem.itemId) {
-                    R.id.delete_all_notes -> {
-                        deleteAllNotes()
-                        true
-                    }
+                    R.id.delete_all_notes -> { deleteAllNotes(); true }
                     else -> false
                 }
             }
 
             override fun onQueryTextSubmit(query: String?): Boolean {
-                if (query != null) {
-                    searchDb(query)
-                }
+                searchDb(query)
                 return true
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
-                if (newText != null) {
-                    searchDb(newText)
-                }
+                searchDb(newText)
                 return true
             }
         }, viewLifecycleOwner, Lifecycle.State.RESUMED)
@@ -106,8 +99,7 @@ class AllNotesFragment : Fragment() {
         val builder = AlertDialog.Builder(requireContext(), R.style.Theme_NotesApp_AlertDialogTheme)
         builder.setPositiveButton("Yes") { _, _ ->
             noteViewModel.deleteAllNotes()
-            Toast.makeText(requireContext(), "All Notes deleted successfully", Toast.LENGTH_SHORT)
-                .show()
+            Toast.makeText(requireContext(), "All Notes deleted successfully", Toast.LENGTH_SHORT).show()
         }
         builder.setNegativeButton("No") { _, _ -> }
         builder.setTitle("Delete All?")
@@ -126,16 +118,25 @@ class AllNotesFragment : Fragment() {
     }
 
     private fun searchDb(query: String?) {
-        val searchQuery = "%$query%"
-        noteViewModel.searchDb(searchQuery).observe(viewLifecycleOwner) { listOfNotes ->
-            listOfNotes?.let {
-                notesAdapter?.setData(it as ArrayList<Note>)
+        val safeQuery = (query ?: "").trim()
+        // If blank, show all notes (avoid %null% and excessive LiveData churn)
+        if (safeQuery.isEmpty()) {
+            noteViewModel.getAllNotes.value?.let { notes ->
+                notesAdapter?.setData(ArrayList(notes))
             }
+            return
+        }
+        val searchQuery = "%$safeQuery%"
+        noteViewModel.searchDb(searchQuery).observe(viewLifecycleOwner) { listOfNotes ->
+            listOfNotes?.let { notesAdapter?.setData(ArrayList(it)) }
         }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
+        // Prevent leaks
+        binding.listOfNotesRecyclerView.adapter = null
+        notesAdapter = null
         _binding = null
     }
 }
