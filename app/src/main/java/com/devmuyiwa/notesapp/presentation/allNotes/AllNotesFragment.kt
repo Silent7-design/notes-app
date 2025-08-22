@@ -16,7 +16,6 @@ import com.devmuyiwa.notesapp.R
 import com.devmuyiwa.notesapp.data.model.Note
 import com.devmuyiwa.notesapp.databinding.FragmentAllNotesBinding
 
-
 class AllNotesFragment : Fragment() {
     private var _binding: FragmentAllNotesBinding? = null
     private val binding get() = _binding!!
@@ -35,17 +34,26 @@ class AllNotesFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         inflateToolbar()
         notesAdapter = AllNotesAdapter(requireContext())
+
         noteViewModel.getAllNotes.observe(viewLifecycleOwner) { listOfNotes ->
             noteViewModel.isDbEmpty(listOfNotes)
             notesAdapter?.setData(listOfNotes as ArrayList<Note>)
         }
         binding.listOfNotesRecyclerView.adapter = notesAdapter
+
         val layoutManager = GridLayoutManager(requireContext(), 2)
         layoutManager.orientation = GridLayoutManager.VERTICAL
         layoutManager.reverseLayout = false
-        
+
+        // ✅ Safe SpanSizeLookup fix (prevents crash)
+        layoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int): Int {
+                return 1 // each note occupies 1 column safely
+            }
+        }
+
         binding.listOfNotesRecyclerView.layoutManager = layoutManager
-        binding.listOfNotesRecyclerView.hasFixedSize()
+        binding.listOfNotesRecyclerView.setHasFixedSize(true)
 
         noteViewModel.emptyDb.observe(viewLifecycleOwner) {
             displayNoData(it)
