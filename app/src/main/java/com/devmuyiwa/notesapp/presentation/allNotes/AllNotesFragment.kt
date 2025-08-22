@@ -15,7 +15,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import com.devmuyiwa.notesapp.R
 import com.devmuyiwa.notesapp.data.model.Note
 import com.devmuyiwa.notesapp.databinding.FragmentAllNotesBinding
-import com.devmuyiwa.notesapp.domain.SpanSize
+
 
 class AllNotesFragment : Fragment() {
     private var _binding: FragmentAllNotesBinding? = null
@@ -43,7 +43,7 @@ class AllNotesFragment : Fragment() {
         val layoutManager = GridLayoutManager(requireContext(), 2)
         layoutManager.orientation = GridLayoutManager.VERTICAL
         layoutManager.reverseLayout = false
-        layoutManager.spanSizeLookup = SpanSize(3, 1, 2)
+        
         binding.listOfNotesRecyclerView.layoutManager = layoutManager
         binding.listOfNotesRecyclerView.hasFixedSize()
 
